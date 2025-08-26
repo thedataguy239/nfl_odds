@@ -15,20 +15,47 @@ class LoopConfig:
     season: int; week: Optional[int]; db: Path; outdir: Path; hfa: float; k: float; k_playoff: float; use_mov: bool
 def log(msg: str):
     ts = datetime.now().isoformat(timespec="seconds"); print(f"[{ts}] {msg}")
-def fetch_nflfastr_results(season: int) -> pd.DataFrame:
-    log("Downloading nflfastR games file…"); df = pd.read_csv(NFLFASTR_GAMES_URL, compression="infer")
-    df = df[df["season"] == season].copy()
-    if "home_score" in df.columns and "away_score" in df.columns:
-        df = df[df["home_score"].notna() & df["away_score"].notna()].copy()
-    for col in ["home_team", "away_team"]: df[col] = df[col].replace(TEAM_NORMALIZE)
-    out = pd.DataFrame({
-        "season": df["season"].astype(int), "week": df["week"].astype(int),
-        "date": pd.to_datetime(df.get("game_date", df.get("gameday"))).dt.date.astype(str),
-        "home_team": df["home_team"], "away_team": df["away_team"],
-        "home_score": df["home_score"].astype(int), "away_score": df["away_score"].astype(int),
+import nfl_data_py as nfl  # NEW
+
+TEAM_NORMALIZE = {"WSH": "WAS", "LA": "LAR", "OAK": "LV", "SD": "LAC"}
+
+def fetch_nfl_results(season: int) -> pd.DataFrame:
+    """Load final game results for a season using nfl_data_py (schedules + scores)."""
+    log("Loading games via nfl_data_py.import_schedules…")
+    df = nfl.import_schedules([season])
+
+    # Filter to this season + games with final scores
+    df = df[(df["season"] == season) & df["home_score"].notna() & df["away_score"].notna()].copy()
+
+    # Regular season only (keep if you want playoffs: remove this line)
+    if "game_type" in df.columns:
+        df = df[df["game_type"].isin(["REG", "REGULAR"])]
+
+    # Normalize basics
+    for col in ["home_team", "away_team"]:
+        df[col] = df[col].replace(TEAM_NORMALIZE)
+
+    # Date column hygiene
+    if "gameday" in df.columns:
+        date_series = pd.to_datetime(df["gameday"])
+    else:
+        date_series = pd.to_datetime(df.get("start_time", pd.NaT))
+    df_out = pd.DataFrame({
+        "season": df["season"].astype(int),
+        "week": df["week"].astype(int),
+        "date": date_series.dt.date.astype(str),
+        "home_team": df["home_team"].astype(str),
+        "away_team": df["away_team"].astype(str),
+        "home_score": df["home_score"].astype(int),
+        "away_score": df["away_score"].astype(int),
         "neutral": df.get("neutral_site", 0).fillna(0).astype(int),
-        "playoff": np.where(df["game_type"].fillna("").isin(["WC","DIV","CON","SB","P"]), 1, 0),
-    }); return out
+        "playoff": 0
+    })
+    # Mark playoffs if present
+    if "game_type" in df.columns:
+        df_out["playoff"] = np.where(df["game_type"].isin(["WC", "DIV", "CON", "SB", "P", "POST"]), 1, 0).astype(int)
+    return df_out
+
 def fetch_espn_schedule(season: int, week: int) -> pd.DataFrame:
     params = {"week": week, "seasontype": 2, "dates": season}
     log(f"Fetching ESPN schedule for season={season}, week={week}…")
@@ -53,7 +80,7 @@ def derive_current_week_from_results(results_df: pd.DataFrame):
     wmax = int(results_df["week"].max()); return wmax, wmax + 1
 def run_weekly(cfg: LoopConfig) -> None:
     conn = core.connect(cfg.db); core.init_db(conn)
-    results = fetch_nflfastr_results(cfg.season)
+    results = fetch_nfl_results(cfg.season)
     engine = core.EloEngine(conn, core.EloConfig(k=cfg.k, k_playoff=cfg.k_playoff, hfa=cfg.hfa, use_mov=cfg.use_mov))
     results_sorted = results.sort_values(["season", "date", "week"]).reset_index(drop=True)
     for _, r in results_sorted.iterrows():
