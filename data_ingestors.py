@@ -3,18 +3,34 @@ import pandas as pd, numpy as np, requests
 from typing import Dict, List
 NFL_GAMES_URL = "https://github.com/nflverse/nflverse-data/releases/download/games/games.csv.gz"
 ESPN_SCOREBOARD = "https://site.api.espn.com/apis/v2/sports/football/nfl/scoreboard"
+import pandas as pd, numpy as np, requests
+import nfl_data_py as nfl
+
 TEAM_NORMALIZE = {"WSH": "WAS", "LA": "LAR", "OAK": "LV", "SD": "LAC"}
+
 def fetch_results_games(season: int) -> pd.DataFrame:
-    df = pd.read_csv(NFL_GAMES_URL, compression="infer"); df = df[df["season"] == season].copy()
-    df = df[df["home_score"].notna() & df["away_score"].notna()].copy()
-    for col in ["home_team", "away_team"]: df[col] = df[col].replace(TEAM_NORMALIZE)
-    out = pd.DataFrame({"season": df["season"].astype(int), "week": df["week"].astype(int),
-                        "date": pd.to_datetime(df.get("game_date", df.get("gameday"))).dt.date.astype(str),
-                        "home_team": df["home_team"], "away_team": df["away_team"],
-                        "home_score": df["home_score"].astype(int), "away_score": df["away_score"].astype(int),
-                        "neutral": df.get("neutral_site", 0).fillna(0).astype(int),
-                        "playoff": np.where(df["game_type"].fillna("").isin(["WC","DIV","CON","SB","P"]), 1, 0)})
+    df = nfl.import_schedules([season])
+    df = df[(df["season"] == season) & df["home_score"].notna() & df["away_score"].notna()].copy()
+    if "game_type" in df.columns:
+        df = df[df["game_type"].isin(["REG", "REGULAR"])]
+    for col in ["home_team", "away_team"]:
+        df[col] = df[col].replace(TEAM_NORMALIZE)
+    date_series = pd.to_datetime(df.get("gameday", df.get("start_time")))
+    out = pd.DataFrame({
+        "season": df["season"].astype(int),
+        "week": df["week"].astype(int),
+        "date": date_series.dt.date.astype(str),
+        "home_team": df["home_team"],
+        "away_team": df["away_team"],
+        "home_score": df["home_score"].astype(int),
+        "away_score": df["away_score"].astype(int),
+        "neutral": df.get("neutral_site", 0).fillna(0).astype(int),
+        "playoff": 0
+    })
+    if "game_type" in df.columns:
+        out["playoff"] = np.where(df["game_type"].isin(["WC","DIV","CON","SB","P","POST"]), 1, 0).astype(int)
     return out
+
 def fetch_schedule_week(season: int, week: int) -> pd.DataFrame:
     params = {"week": week, "seasontype": 2, "dates": season}; r = requests.get(ESPN_SCOREBOARD, params=params, timeout=20)
     data = r.json(); rows: List[Dict] = []
