@@ -87,7 +87,8 @@ class EloEngine:
             (team, season, float(rating), now),
         )
     def _game_id(self, season: int, week: int, home: str, away: str, date: str) -> str:
-        return f\"{season}_{week}_{home}_vs_{away}_{date}\"
+        return f"{season}_{week}_{home}_vs_{away}_{date}"
+
     def record_game(self, *, season: int, week: int, date: str, home: str, away: str,
                     home_score: Optional[int], away_score: Optional[int], neutral: int, playoff: int) -> str:
         gid = self._game_id(season, week, home, away, date)
