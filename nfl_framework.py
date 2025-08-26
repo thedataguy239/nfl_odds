@@ -161,8 +161,10 @@ def cmd_ingest_results(args):
 def cmd_predict_week(args):
     conn = connect(Path(args.db)); init_db(conn)
     cfg = EloConfig(k=args.k, k_playoff=args.k_playoff, hfa=args.hfa, use_mov=bool(args.use_mov)); engine = EloEngine(conn, cfg)
-    cols = {**SCHEDULE_DEFAULTS}; if args.columns_json: cols.update(json.loads(args.columns_json))
-    df = pd.read_csv(args.schedule)
+    cols = {**SCHEDULE_DEFAULTS}
+    if args.columns_json:
+        cols.update(json.loads(args.columns_json))
+        df = pd.read_csv(args.schedule)
     if args.season is not None: df = df[df[cols["season"]] == int(args.season)]
     if args.week is not None: df = df[df[cols["week"]] == int(args.week)]
     df[cols["date"]] = pd.to_datetime(df[cols["date"]]).dt.date.astype(str)
