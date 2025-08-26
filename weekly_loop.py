@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Optional, Dict, List
 import requests, pandas as pd, numpy as np
 import nfl_framework as core
-NFLFASTR_GAMES_URL = "https://raw.githubusercontent.com/nflverse/nflfastR-data/master/data/games.csv.gz"
+NFLFASTR_GAMES_URL = "https://github.com/nflverse/nflverse-data/releases/download/games/games.csv.gz"
 ESPN_SCOREBOARD = "https://site.api.espn.com/apis/v2/sports/football/nfl/scoreboard"
 TEAM_NORMALIZE = {"WSH": "WAS", "LA": "LAR", "OAK": "LV", "SD": "LAC"}
 @dataclass
