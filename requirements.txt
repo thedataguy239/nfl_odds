@@ -3,3 +3,4 @@ numpy
 requests
 scikit-learn
 pyyaml
+nfl-data-py
