@@ -16,6 +16,8 @@ def fetch_results_games(season: int) -> pd.DataFrame:
     for col in ["home_team", "away_team"]:
         df[col] = df[col].replace(TEAM_NORMALIZE)
     date_series = pd.to_datetime(df.get("gameday", df.get("start_time")))
+    neutral_series = df["neutral_site"] if "neutral_site" in df.columns else pd.Series(0, index=df.index)
+    
     out = pd.DataFrame({
         "season": df["season"].astype(int),
         "week": df["week"].astype(int),
@@ -24,10 +26,12 @@ def fetch_results_games(season: int) -> pd.DataFrame:
         "away_team": df["away_team"],
         "home_score": df["home_score"].astype(int),
         "away_score": df["away_score"].astype(int),
-        "neutral": df.get("neutral_site", 0).fillna(0).astype(int),
-        "playoff": 0
+        "neutral": neutral_series.fillna(0).astype(int),
+        "playoff": 0,
     })
     if "game_type" in df.columns:
+        out["playoff"] = np.where(df["game_type"].isin(["WC","DIV","CON","SB","P","POST"]), 1, 0).astype(int)
+
         out["playoff"] = np.where(df["game_type"].isin(["WC","DIV","CON","SB","P","POST"]), 1, 0).astype(int)
     return out
 
