@@ -1,7 +1,7 @@
 from __future__ import annotations
 import pandas as pd, numpy as np, requests
 from typing import Dict, List
-NFL_GAMES_URL = "https://raw.githubusercontent.com/nflverse/nflfastR-data/master/data/games.csv.gz"
+NFL_GAMES_URL = "https://github.com/nflverse/nflverse-data/releases/download/games/games.csv.gz"
 ESPN_SCOREBOARD = "https://site.api.espn.com/apis/v2/sports/football/nfl/scoreboard"
 TEAM_NORMALIZE = {"WSH": "WAS", "LA": "LAR", "OAK": "LV", "SD": "LAC"}
 def fetch_results_games(season: int) -> pd.DataFrame:
