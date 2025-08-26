@@ -27,33 +27,31 @@ def fetch_nfl_results(season: int) -> pd.DataFrame:
     # Filter to this season + games with final scores
     df = df[(df["season"] == season) & df["home_score"].notna() & df["away_score"].notna()].copy()
 
-    # Regular season only (keep if you want playoffs: remove this line)
-    if "game_type" in df.columns:
-        df = df[df["game_type"].isin(["REG", "REGULAR"])]
-
-    # Normalize basics
-    for col in ["home_team", "away_team"]:
-        df[col] = df[col].replace(TEAM_NORMALIZE)
-
     # Date column hygiene
-    if "gameday" in df.columns:
-        date_series = pd.to_datetime(df["gameday"])
-    else:
-        date_series = pd.to_datetime(df.get("start_time", pd.NaT))
-    df_out = pd.DataFrame({
-        "season": df["season"].astype(int),
-        "week": df["week"].astype(int),
-        "date": date_series.dt.date.astype(str),
-        "home_team": df["home_team"].astype(str),
-        "away_team": df["away_team"].astype(str),
-        "home_score": df["home_score"].astype(int),
-        "away_score": df["away_score"].astype(int),
-        "neutral": df.get("neutral_site", 0).fillna(0).astype(int),
-        "playoff": 0
-    })
-    # Mark playoffs if present
-    if "game_type" in df.columns:
-        df_out["playoff"] = np.where(df["game_type"].isin(["WC", "DIV", "CON", "SB", "P", "POST"]), 1, 0).astype(int)
+if "gameday" in df.columns:
+    date_series = pd.to_datetime(df["gameday"])
+else:
+    date_series = pd.to_datetime(df.get("start_time", pd.NaT))
+
+# Neutral-site column (Series of zeros if missing)
+neutral_series = df["neutral_site"] if "neutral_site" in df.columns else pd.Series(0, index=df.index)
+
+df_out = pd.DataFrame({
+    "season": df["season"].astype(int),
+    "week": df["week"].astype(int),
+    "date": date_series.dt.date.astype(str),
+    "home_team": df["home_team"].astype(str),
+    "away_team": df["away_team"].astype(str),
+    "home_score": df["home_score"].astype(int),
+    "away_score": df["away_score"].astype(int),
+    "neutral": neutral_series.fillna(0).astype(int),
+    "playoff": 0,
+})
+
+# Mark playoffs if present
+if "game_type" in df.columns:
+    df_out["playoff"] = np.where(df["game_type"].isin(["WC", "DIV", "CON", "SB", "P", "POST"]), 1, 0).astype(int)
+
     return df_out
 
 def fetch_espn_schedule(season: int, week: int) -> pd.DataFrame:
