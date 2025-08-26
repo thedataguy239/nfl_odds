@@ -1,0 +1,51 @@
+name: Weekly NFL Predictions
+
+on:
+  schedule:
+    - cron: '0 13 * * 2'   # Tuesdays 9:00 AM ET (13:00 UTC during EDT)
+  workflow_dispatch: {}
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Init DB & Season
+        run: |
+          python nfl_framework.py init-db --db nfl.db
+          python nfl_framework.py new-season --db nfl.db --season 2025
+
+      - name: Elo weekly loop (results + schedule + elo_preds)
+        run: |
+          python weekly_loop.py --db nfl.db --season 2025 --week auto --outdir out/weekly --hfa 65 --k 20 --use-mov
+
+      - name: Blended predictions (Elo + recent-form + injuries)
+        run: |
+          python blended_predictor.py --db nfl.db --season 2025 --week auto --outdir out/weekly
+
+      - name: Outlier scan (model vs market)
+        env:
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}  # optional
+        run: |
+          WEEK=$(ls out/weekly/predictions_blended_week*.csv | sed -E 's/.*week([0-9]+).csv/\1/')
+          python compare_odds.py --season 2025 --week $WEEK \
+            --blended out/weekly/predictions_blended_week${WEEK}.csv --outdir out/weekly --threshold 0.15
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: predictions
+          path: |
+            out/weekly/*.csv
+            nfl.db
