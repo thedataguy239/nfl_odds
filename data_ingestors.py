@@ -84,7 +84,18 @@ def fetch_cfb_results_games(season: int) -> pd.DataFrame:
                 "neutral": int(comp.get("neutralSite") or 0),
                 "playoff": 0,
             })
-    return pd.DataFrame(rows)
+    cols = [
+        "season",
+        "week",
+        "date",
+        "home_team",
+        "away_team",
+        "home_score",
+        "away_score",
+        "neutral",
+        "playoff",
+    ]
+    return pd.DataFrame(rows, columns=cols)
 
 def fetch_cfb_schedule_week(season: int, week: int) -> pd.DataFrame:
     params = {"week": week, "seasontype": 2, "dates": season}
@@ -104,7 +115,8 @@ def fetch_cfb_schedule_week(season: int, week: int) -> pd.DataFrame:
                      "home_team": h_abbr,
                      "away_team": a_abbr,
                      "neutral": neutral})
-    return pd.DataFrame(rows)
+    cols = ["season", "week", "date", "home_team", "away_team", "neutral"]
+    return pd.DataFrame(rows, columns=cols)
 def recent_form_feature(results: pd.DataFrame, window_games: int = 4) -> pd.DataFrame:
     long_rows = []
     for _, r in results.iterrows():
