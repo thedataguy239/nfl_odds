@@ -1,0 +1,50 @@
+name: Weekly CFB Predictions
+
+on:
+  schedule:
+    - cron: '0 13 * * 2'   # Tuesdays 13:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Init DB & Season
+        run: |
+          YEAR=$(date +'%Y')
+          python cfb_framework.py init-db --db cfb.db
+          python cfb_framework.py new-season --db cfb.db --season $YEAR
+
+      - name: Weekly loop & predictions
+        run: |
+          YEAR=$(date +'%Y')
+          python weekly_loop_cfb.py --db cfb.db --season $YEAR --week auto --outdir out/cfb_weekly
+
+      - name: Outlier scan (model vs market)
+        env:
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}  # optional
+        run: |
+          YEAR=$(date +'%Y')
+          WEEK=$(ls out/cfb_weekly/predictions_week*.csv | sed -E 's/.*week([0-9]+).csv/\1/')
+          python compare_odds.py --season $YEAR --week $WEEK \
+            --blended out/cfb_weekly/predictions_week${WEEK}.csv --outdir out/cfb_weekly --threshold 0.15
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cfb-predictions
+          path: |
+            out/cfb_weekly/*.csv
+            cfb.db
