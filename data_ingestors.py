@@ -3,7 +3,9 @@ import pandas as pd, numpy as np, requests
 from typing import Dict, List
 NFL_GAMES_URL = "https://github.com/nflverse/nflverse-data/releases/download/games/games.csv.gz"
 ESPN_SCOREBOARD = "https://site.api.espn.com/apis/v2/sports/football/nfl/scoreboard"
+CFB_SCOREBOARD = "https://site.api.espn.com/apis/v2/sports/football/college-football/scoreboard"
 import pandas as pd, numpy as np, requests
+from cfb_teams import POWER_FIVE_TEAMS
 import nfl_data_py as nfl
 
 TEAM_NORMALIZE = {"WSH": "WAS", "LA": "LAR", "OAK": "LV", "SD": "LAC"}
@@ -52,6 +54,57 @@ def fetch_schedule_week(season: int, week: int) -> pd.DataFrame:
     if not df.empty:
         for col in ["home_team", "away_team"]: df[col] = df[col].replace(TEAM_NORMALIZE)
     return df
+
+
+def fetch_cfb_results_games(season: int) -> pd.DataFrame:
+    rows: List[Dict] = []
+    for week in range(1, 16):
+        params = {"week": week, "seasontype": 2, "dates": season}
+        r = requests.get(CFB_SCOREBOARD, params=params, timeout=20)
+        data = r.json()
+        for ev in data.get("events", []):
+            comp = (ev.get("competitions") or [{}])[0]
+            teams = comp.get("competitors", [])
+            home = next((t for t in teams if t.get("homeAway") == "home"), None)
+            away = next((t for t in teams if t.get("homeAway") == "away"), None)
+            if not home or not away: continue
+            h_abbr = (home.get("team", {}) or {}).get("abbreviation")
+            a_abbr = (away.get("team", {}) or {}).get("abbreviation")
+            if h_abbr not in POWER_FIVE_TEAMS or a_abbr not in POWER_FIVE_TEAMS: continue
+            date_iso = comp.get("date")
+            date_str = pd.to_datetime(date_iso).tz_convert("UTC").date().isoformat() if date_iso else ""
+            rows.append({
+                "season": season,
+                "week": week,
+                "date": date_str,
+                "home_team": h_abbr,
+                "away_team": a_abbr,
+                "home_score": int(home.get("score") or 0),
+                "away_score": int(away.get("score") or 0),
+                "neutral": int(comp.get("neutralSite") or 0),
+                "playoff": 0,
+            })
+    return pd.DataFrame(rows)
+
+def fetch_cfb_schedule_week(season: int, week: int) -> pd.DataFrame:
+    params = {"week": week, "seasontype": 2, "dates": season}
+    r = requests.get(CFB_SCOREBOARD, params=params, timeout=20)
+    data = r.json(); rows: List[Dict] = []
+    for ev in data.get("events", []):
+        comp = (ev.get("competitions") or [{}])[0]; date_iso = comp.get("date")
+        date_str = pd.to_datetime(date_iso).tz_convert("UTC").date().isoformat() if date_iso else ""
+        neutral = int(comp.get("neutralSite") or 0); teams = comp.get("competitors", [])
+        home = next((t for t in teams if t.get("homeAway") == "home"), None)
+        away = next((t for t in teams if t.get("homeAway") == "away"), None)
+        if not home or not away: continue
+        h_abbr = (home.get("team", {}) or {}).get("abbreviation")
+        a_abbr = (away.get("team", {}) or {}).get("abbreviation")
+        if h_abbr not in POWER_FIVE_TEAMS or a_abbr not in POWER_FIVE_TEAMS: continue
+        rows.append({"season": season, "week": week, "date": date_str,
+                     "home_team": h_abbr,
+                     "away_team": a_abbr,
+                     "neutral": neutral})
+    return pd.DataFrame(rows)
 def recent_form_feature(results: pd.DataFrame, window_games: int = 4) -> pd.DataFrame:
     long_rows = []
     for _, r in results.iterrows():
