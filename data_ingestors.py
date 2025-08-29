@@ -1,12 +1,17 @@
 from __future__ import annotations
-import pandas as pd, numpy as np, requests
+
 from typing import Dict, List
+
+import numpy as np
+import pandas as pd
+import requests
+import nfl_data_py as nfl
+
+from cfb_teams import POWER_FIVE_TEAMS
+
 NFL_GAMES_URL = "https://github.com/nflverse/nflverse-data/releases/download/games/games.csv.gz"
 ESPN_SCOREBOARD = "https://site.api.espn.com/apis/v2/sports/football/nfl/scoreboard"
 CFB_SCOREBOARD = "https://site.api.espn.com/apis/v2/sports/football/college-football/scoreboard"
-import pandas as pd, numpy as np, requests
-from cfb_teams import POWER_FIVE_TEAMS
-import nfl_data_py as nfl
 
 TEAM_NORMALIZE = {"WSH": "WAS", "LA": "LAR", "OAK": "LV", "SD": "LAC"}
 
@@ -32,9 +37,9 @@ def fetch_results_games(season: int) -> pd.DataFrame:
         "playoff": 0,
     })
     if "game_type" in df.columns:
-        out["playoff"] = np.where(df["game_type"].isin(["WC","DIV","CON","SB","P","POST"]), 1, 0).astype(int)
-
-        out["playoff"] = np.where(df["game_type"].isin(["WC","DIV","CON","SB","P","POST"]), 1, 0).astype(int)
+        out["playoff"] = np.where(
+            df["game_type"].isin(["WC", "DIV", "CON", "SB", "P", "POST"]), 1, 0
+        ).astype(int)
     return out
 
 def fetch_schedule_week(season: int, week: int) -> pd.DataFrame:
